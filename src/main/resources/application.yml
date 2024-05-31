@@ -1,0 +1,70 @@
+spring:
+  application:
+    name: edge-service
+  lifecycle:
+    timeout-per-shutdown-phase: 15s  # Определяет 15-секундный льготный период
+  cloud:
+    gateway:
+      mvc:
+        routes:                                                      # Список определений маршрутов
+          - id: catalog-route                                        # Идентификатор маршрута
+            uri: ${CATALOG_SERVICE_URL:http://localhost:9001}/books
+            predicates:
+              - Path=/books/**                                       # Предикат — это путь к сопоставлению
+            filters:
+              - name: CircuitBreaker
+                args:
+                  name: catalogCircuitBreaker                       # Наименование автоматического выключателя
+                  fallbackUri: forward:/catalog-fallback           # Перенаправляет запрос на этот URI, когда канал открыт
+          - id: order-route
+            uri: ${ORDER_SERVICE_URL:http://localhost:9002}/orders  # Значение URI берется из переменной среды или из значения по умолчанию
+            predicates:
+              - Path=/orders/**
+            filters:
+              - name: CircuitBreaker  # Наименование фильтра
+                args:
+                  name:
+                    orderCircuitBreaker                    # Для этого автоматического выключателя не определен резервный вариант
+        httpclient:                                                # Свойства конфигурации для HTTP-клиента
+          connect-timeout: 2000                                    # Ограничение по времени установления соединения (в мс)
+         # response-timeout: 5s                                     # Срок получения ответа (Продолжительность)
+         # pool:
+         #   type: elastic                                          # Тип пула соединений (эластичный, фиксированный или отключенный)
+         #   max-idle-time: 15s                                     # Время простоя, по истечении которого канал связи будет закрыт
+         #   max-life-time: 60s                                     # Время, по истечении которого канал связи будет закрыт
+     # default-filters:                                             # Список фильтров по умолчанию
+     #   - name: Retry                                              # Имя фильтра
+      #    args:
+      #      retries: 3                                             # Не более 3 повторных попыток
+     #       methods: GET                                           # Повторные попытки только GET-запросов
+      #      series: SERVER_ERROR                                   # Повторяет попытку только при ошибке 5XX
+     #       exceptions: java.io.IOException,java.util.concurrent.TimeoutException # Повторные попытки только при возникновении заданных исключений
+       #     backoff:                                               # Повторные попытки с задержкой
+      #        firstBackoff: 50ms
+      #        maxBackOff: 500ms
+      #          factor: 2
+       #         basedOnPreviousValue: false
+
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:                                      # Компонент конфигурации по умолчанию для всех автоматических выключателей
+        slidingWindowSize: 20                       # Размер скользящего окна, используемого для записи результатов вызовов при замкнутом канале
+        permittedNumberOfCallsInHalfOpenState: 5    # Количество разрешенных вызовов при полу-разомкнутом канале
+        failureRateThreshold: 50                    # Когда частота отказов превышает пороговое значение, цепь становится разомкнутой
+        waitDurationInOpenState: 15000              # Время ожидания перед переходом из открытого состояния в полуоткрытое (мс)
+  timelimiter:
+    configs:
+      default:                                     # Конфигурационный компонент по умолчанию для всех ограничителей времени
+        timeoutDuration: 5s                        # Настройка тайм-аута (в секундах)
+
+server:
+  port: 9000
+  netty:
+    connection-timeout: 2s # Как долго ждать установки TCP-соединения с сервером
+    idle-timeout: 15s      # Сколько времени ждать перед закрытием TCP-соединения, если данные не передаются
+  shutdown: graceful       # Обеспечивает корректное завершение работы
+
+
+
