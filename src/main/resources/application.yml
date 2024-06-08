@@ -1,11 +1,15 @@
 spring:
+  session:
+    store-type: redis
+    timeout: 10m
+    redis:
+      namespace: polar:edge
   application:
     name: edge-service
   lifecycle:
     timeout-per-shutdown-phase: 15s  # Определяет 15-секундный льготный период
   cloud:
     gateway:
-      mvc:
         routes:                                                      # Список определений маршрутов
           - id: catalog-route                                        # Идентификатор маршрута
             uri: ${CATALOG_SERVICE_URL:http://localhost:9001}/books
@@ -33,6 +37,13 @@ spring:
          #   max-idle-time: 15s                                     # Время простоя, по истечении которого канал связи будет закрыт
          #   max-life-time: 60s                                     # Время, по истечении которого канал связи будет закрыт
      # default-filters:                                             # Список фильтров по умолчанию
+          # - SaveSession                                           # Обеспечивает сохранение данных сеанса перед пересылкой запроса в нисходящем потоке
+       #  name: RequestRateLimiter
+         #  args:
+         #    redis-rate-limiter:
+        #       replenishRate: 10     Количество жетонов, капающих в ведро каждую секунду
+        #       burstCapacity: 20     Позволяет выполнять пакеты запросов до 20
+        #       requestedTokens: 1    Сколько токенов стоит запрос
      #   - name: Retry                                              # Имя фильтра
       #    args:
       #      retries: 3                                             # Не более 3 повторных попыток
@@ -45,6 +56,11 @@ spring:
       #          factor: 2
        #         basedOnPreviousValue: false
 
+  redis:
+    connect-timeout: 2s  # Ограничение по времени для установления соединения
+    host: localhost      # Узел Redis по умолчанию
+    port: 6379           # Порт Redis по умолчанию
+    timeout: 1s          # Срок получения ответа
 
 resilience4j:
   circuitbreaker:
@@ -59,12 +75,19 @@ resilience4j:
       default:                                     # Конфигурационный компонент по умолчанию для всех ограничителей времени
         timeoutDuration: 5s                        # Настройка тайм-аута (в секундах)
 
+logging:
+  level:
+    io.github.resilience4j: DEBUG
+
+
 server:
   port: 9000
   netty:
     connection-timeout: 2s # Как долго ждать установки TCP-соединения с сервером
     idle-timeout: 15s      # Сколько времени ждать перед закрытием TCP-соединения, если данные не передаются
   shutdown: graceful       # Обеспечивает корректное завершение работы
+
+
 
 
 
